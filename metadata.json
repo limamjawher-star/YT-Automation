@@ -1,0 +1,7 @@
+{
+  "name": "Local AI YouTube Video Automation Pipeline",
+  "description": "Automated AI YouTube video creation pipeline using Gemini script planning, Imagen visuals, Google TTS narration, and FFmpeg assembly.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
