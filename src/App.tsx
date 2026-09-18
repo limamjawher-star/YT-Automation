@@ -6,13 +6,16 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header.js';
 import { StageProgressBar } from './components/StageProgressBar.js';
+import { PipelineLiveControls } from './components/PipelineLiveControls.js';
 import { ProjectConfigForm } from './components/ProjectConfigForm.js';
+import { ResearchStageView } from './components/ResearchStageView.js';
 import { ScriptStageView } from './components/ScriptStageView.js';
 import { VisualsStageView } from './components/VisualsStageView.js';
 import { VoiceoverStageView } from './components/VoiceoverStageView.js';
 import { AssemblyStageView } from './components/AssemblyStageView.js';
 import { ProjectHistoryModal } from './components/ProjectHistoryModal.js';
 import { SetupReadmeModal } from './components/SetupReadmeModal.js';
+import { usePipelineSSE } from './hooks/usePipelineSSE.js';
 import { 
   PipelineStage, 
   SystemStatus, 
@@ -33,6 +36,25 @@ export default function App() {
 
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [isDocsOpen, setIsDocsOpen] = useState<boolean>(false);
+
+  // Helper to sync updated project into state
+  const updateProjectState = (updated: VideoProject) => {
+    setCurrentProject(updated);
+    setProjects((prev) => {
+      const exists = prev.some((p) => p.id === updated.id);
+      if (exists) {
+        return prev.map((p) => (p.id === updated.id ? updated : p));
+      }
+      return [updated, ...prev];
+    });
+  };
+
+  // Real-time Server-Sent Events (SSE) hook - no fake timers or interval polling
+  const pipeline = usePipelineSSE(currentProject, (updated) => {
+    updateProjectState(updated);
+  });
+
+  const isPipelineRunning = isLoading || pipeline.activeJob?.status === 'running' || currentProject?.status === 'generating';
 
   // Fetch status and projects on mount
   useEffect(() => {
@@ -69,6 +91,8 @@ export default function App() {
             setActiveTab('visuals');
           } else if (data[0].scenes?.length > 0) {
             setActiveTab('scenes');
+          } else if (data[0].researchStatus || data[0].currentStage === 'research') {
+            setActiveTab('research');
           }
         }
       }
@@ -77,19 +101,7 @@ export default function App() {
     }
   };
 
-  // Helper to sync updated project into state
-  const updateProjectState = (updated: VideoProject) => {
-    setCurrentProject(updated);
-    setProjects((prev) => {
-      const exists = prev.some((p) => p.id === updated.id);
-      if (exists) {
-        return prev.map((p) => (p.id === updated.id ? updated : p));
-      }
-      return [updated, ...prev];
-    });
-  };
-
-  // Create new project and start step-by-step
+  // Create new project and start step-by-step: Dedicated Research Stage before scripting
   const handleCreateStepByStep = async (config: {
     topic: string;
     aspectRatio: VideoAspectRatio;
@@ -97,6 +109,8 @@ export default function App() {
     visualStyle: VisualStyle;
     voice: VoiceName;
     targetDurationMinutes: number;
+    userProvidedSources?: string;
+    userResearchNotes?: string;
   }) => {
     setIsLoading(true);
     setErrorBanner(null);
@@ -110,20 +124,42 @@ export default function App() {
       const newProj = await createRes.json();
       updateProjectState(newProj);
 
-      // 2. Generate script immediately
-      const scriptRes = await fetch(`/api/projects/${newProj.id}/generate-script`, {
+      // 2. Generate structured topic research first
+      setActiveTab('research');
+      const researchRes = await fetch(`/api/projects/${newProj.id}/generate-research`, {
+        method: 'POST',
+      });
+      if (researchRes.ok) {
+        const data = await researchRes.json();
+        updateProjectState(data.project || newProj);
+      }
+      fetchStatus();
+    } catch (err: any) {
+      setErrorBanner(err.message || 'Error initializing project research');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Proceed from Research stage to Script generation (uses approved research object)
+  const handleProceedFromResearchToScript = async () => {
+    if (!currentProject) return;
+    setIsLoading(true);
+    setErrorBanner(null);
+    try {
+      setActiveTab('scenes');
+      const scriptRes = await fetch(`/api/projects/${currentProject.id}/generate-script`, {
         method: 'POST',
       });
       if (!scriptRes.ok) {
         const errData = await scriptRes.json();
-        throw new Error(errData.error || 'Failed to generate script');
+        throw new Error(errData.error || 'Failed to generate script from research');
       }
       const withScript = await scriptRes.json();
       updateProjectState(withScript);
-      setActiveTab('scenes');
       fetchStatus();
     } catch (err: any) {
-      setErrorBanner(err.message || 'Error initializing project');
+      setErrorBanner(err.message || 'Failed to generate script');
     } finally {
       setIsLoading(false);
     }
@@ -157,12 +193,12 @@ export default function App() {
         const errData = await runRes.json();
         throw new Error(errData.error || 'Pipeline execution failed');
       }
-      const completed = await runRes.json();
-      updateProjectState(completed);
+      const data = await runRes.json();
+      const initialProject = data.project || data;
+      updateProjectState(initialProject);
       fetchStatus();
     } catch (err: any) {
       setErrorBanner(err.message || 'Pipeline execution error');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -312,11 +348,11 @@ export default function App() {
         const err = await res.json();
         throw new Error(err.error || 'Failed to run full pipeline');
       }
-      const updated = await res.json();
+      const data = await res.json();
+      const updated = data.project || data;
       updateProjectState(updated);
     } catch (err: any) {
       setErrorBanner(err.message);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -378,6 +414,23 @@ export default function App() {
         />
       )}
 
+      {/* Real-time Operational Pipeline Controls */}
+      {currentProject && (
+        <PipelineLiveControls
+          job={pipeline.activeJob}
+          activeAsset={pipeline.activeAsset}
+          eventsLog={pipeline.eventsLog}
+          warnings={pipeline.warnings}
+          connectionStatus={pipeline.connectionStatus}
+          onCancel={pipeline.cancelJob}
+          onPause={pipeline.pauseJob}
+          onResumeCheckpoint={pipeline.resumeFromCheckpoint}
+          onRetryFailed={pipeline.retryFailed}
+          onRetryStage={pipeline.retryStage}
+          onRestartFromStage={pipeline.restartFromStage}
+        />
+      )}
+
       {/* Error banner notification */}
       {errorBanner && (
         <div className="max-w-4xl mx-auto mt-4 px-4 w-full">
@@ -401,11 +454,22 @@ export default function App() {
             project={currentProject}
             onSaveAndNextStage={handleCreateStepByStep}
             onSaveAndRunAll={handleCreateAndRunAll}
-            isLoading={isLoading}
+            isLoading={isPipelineRunning}
           />
         )}
 
-        {/* Stage 2: Script & Storyboard */}
+        {/* Stage 2: Research & Verification Dossier */}
+        {activeTab === 'research' && currentProject && (
+          <ResearchStageView
+            project={currentProject}
+            onProceedToScript={handleProceedFromResearchToScript}
+            onRunFullPipeline={handleRunFullPipelineForCurrent}
+            onUpdateProject={handleUpdateProject}
+            isLoading={isPipelineRunning}
+          />
+        )}
+
+        {/* Stage 3: Script & Storyboard */}
         {activeTab === 'scenes' && currentProject && (
           <ScriptStageView
             project={currentProject}
@@ -413,7 +477,7 @@ export default function App() {
             onProceedToVisuals={handleGenerateVisuals}
             onRunFullPipeline={handleRunFullPipelineForCurrent}
             onUpdateProject={handleUpdateProject}
-            isLoading={isLoading}
+            isLoading={isPipelineRunning}
           />
         )}
 
@@ -424,7 +488,7 @@ export default function App() {
             onRegenerateAllImages={handleGenerateVisuals}
             onRegenerateSingleImage={handleRegenerateSingleImage}
             onProceedToVoiceover={handleGenerateVoiceover}
-            isLoading={isLoading}
+            isLoading={isPipelineRunning}
           />
         )}
 
@@ -435,7 +499,7 @@ export default function App() {
             onRegenerateAllAudio={handleGenerateVoiceover}
             onRegenerateSingleAudio={handleRegenerateSingleAudio}
             onProceedToAssembly={handleAssembleVideo}
-            isLoading={isLoading}
+            isLoading={isPipelineRunning}
           />
         )}
 
@@ -444,7 +508,7 @@ export default function App() {
           <AssemblyStageView
             project={currentProject}
             onReAssembleVideo={handleAssembleVideo}
-            isLoading={isLoading}
+            isLoading={isPipelineRunning}
           />
         )}
       </main>

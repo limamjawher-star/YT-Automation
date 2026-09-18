@@ -6,7 +6,8 @@ import {
   Film, 
   Check, 
   Loader2, 
-  Settings2 
+  Settings2,
+  BookOpen
 } from 'lucide-react';
 import { PipelineStage, VideoProject } from '../types.js';
 
@@ -24,11 +25,12 @@ interface StageInfo {
 }
 
 const STAGES: StageInfo[] = [
-  { id: 'topic', label: '1. Settings', subtitle: 'Topic & Style', icon: Settings2 },
-  { id: 'scenes', label: '2. Script', subtitle: 'Gemini 3.8 Storyboard', icon: FileText },
-  { id: 'visuals', label: '3. Visuals', subtitle: 'Google Imagen/AI', icon: ImageIcon },
-  { id: 'voiceover', label: '4. Voiceover', subtitle: 'Google TTS Audio', icon: Mic },
-  { id: 'assembly', label: '5. Assembly', subtitle: 'FFmpeg Video Render', icon: Film },
+  { id: 'topic', label: '1. Topic', subtitle: 'Settings & Style', icon: Settings2 },
+  { id: 'research', label: '2. Research', subtitle: 'Facts & Claims', icon: BookOpen },
+  { id: 'scenes', label: '3. Script', subtitle: 'Gemini Storyboard', icon: FileText },
+  { id: 'visuals', label: '4. Visuals', subtitle: 'Google Imagen/AI', icon: ImageIcon },
+  { id: 'voiceover', label: '5. Voiceover', subtitle: 'Google TTS Audio', icon: Mic },
+  { id: 'assembly', label: '6. Assembly', subtitle: 'FFmpeg Video Render', icon: Film },
 ];
 
 export const StageProgressBar: React.FC<StageProgressBarProps> = ({
@@ -41,7 +43,7 @@ export const StageProgressBar: React.FC<StageProgressBarProps> = ({
       return 'generating';
     }
 
-    const order: PipelineStage[] = ['topic', 'script', 'scenes', 'visuals', 'voiceover', 'assembly', 'completed'];
+    const order: PipelineStage[] = ['topic', 'research', 'script', 'scenes', 'visuals', 'voiceover', 'assembly', 'completed'];
     const projectIndex = order.indexOf(project.currentStage);
     const thisIndex = order.indexOf(stageId === 'scenes' ? 'script' : stageId);
 
@@ -51,6 +53,7 @@ export const StageProgressBar: React.FC<StageProgressBarProps> = ({
 
     // Specific asset checks
     if (stageId === 'topic') return 'completed';
+    if (stageId === 'research' && (project.researchStatus === 'approved' || project.researchSummary || (project.scenes && project.scenes.length > 0))) return 'completed';
     if (stageId === 'scenes' && project.scenes && project.scenes.length > 0) return 'completed';
     if (stageId === 'visuals' && project.scenes?.some(s => s.imageUrl)) return 'completed';
     if (stageId === 'voiceover' && project.scenes?.some(s => s.audioUrl)) return 'completed';
@@ -64,7 +67,7 @@ export const StageProgressBar: React.FC<StageProgressBarProps> = ({
     <div className="w-full bg-slate-900/60 border-b border-slate-800 px-4 py-3">
       <div className="max-w-7xl mx-auto">
         {/* Stages list */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {STAGES.map((stage) => {
             const status = getStageStatus(stage.id);
             const isSelected = activeTab === stage.id;

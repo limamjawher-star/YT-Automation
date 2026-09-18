@@ -1,0 +1,47 @@
+[
+  {
+    "id": "scene-0-1789734116021",
+    "sceneNumber": 0,
+    "narration": "Ever wonder why coffee makes you feel superhuman? It all starts with a molecule called adenosine. Throughout the day, adenosine builds up in your brain, telling you it is time to sleep.",
+    "visualDescription": "A close-up, cinematic shot of a fresh cup of steaming coffee on a desk, transitioning into an abstract digital animation of glowing molecular structures floating in a dark background.",
+    "imagePrompt": "Digital concept art, cinematic close-up of a steaming coffee mug on a dark wooden desk, soft morning sunlight, bokeh background, floating glowing adenosine molecules, vibrant blue and gold colors, 8k resolution, highly detailed.",
+    "estimatedDurationSeconds": 10,
+    "onScreenText": "The Science Of Coffee",
+    "status": "ready",
+    "isGeneratingImage": false,
+    "imageUrl": "/storage/projects/proj_1789733870551_dy3uf/scenes/scene_0.png?t=1789734121641",
+    "isGeneratingAudio": false,
+    "audioUrl": "/storage/projects/proj_1789733870551_dy3uf/audio/scene_0.wav?t=1789734134580",
+    "actualDurationSeconds": 13.2
+  },
+  {
+    "id": "scene-1-1789734116021",
+    "sceneNumber": 1,
+    "narration": "But caffeine is a master of disguise. It mimics adenosine and wedges itself into your brain's receptors, blocking the 'sleepy' signals.",
+    "visualDescription": "High-tech 3D animation showing a caffeine molecule physically blocking a receptor site in a stylized neuron network.",
+    "imagePrompt": "Digital concept art, stylized neural network, glowing receptor sites, a caffeine molecule shape locking into place, futuristic medical visualization, neon cyan and magenta accents, sharp focus, cinematic lighting.",
+    "estimatedDurationSeconds": 10,
+    "onScreenText": "Blocking The Sleep Signals",
+    "status": "ready",
+    "isGeneratingImage": false,
+    "imageUrl": "/storage/projects/proj_1789733870551_dy3uf/scenes/scene_1.png?t=1789734122075",
+    "isGeneratingAudio": false,
+    "audioUrl": "/storage/projects/proj_1789733870551_dy3uf/audio/scene_1.wav?t=1789734141079",
+    "actualDurationSeconds": 9.72
+  },
+  {
+    "id": "scene-2-1789734116021",
+    "sceneNumber": 2,
+    "narration": "Your brain stays alert, your focus sharpens, and you are ready to conquer the day. That is the science of your morning brew.",
+    "visualDescription": "A person looking energized and focused at a computer screen, with light trails suggesting mental clarity and productivity.",
+    "imagePrompt": "Digital concept art, a person sitting at a desk looking energized and productive, glowing light trails surrounding their head, high-tech office environment, sharp lines, energetic composition, cinematic depth of field, 16:9 aspect ratio.",
+    "estimatedDurationSeconds": 10,
+    "onScreenText": "Conquer Your Day",
+    "status": "ready",
+    "isGeneratingImage": false,
+    "imageUrl": "/storage/projects/proj_1789733870551_dy3uf/scenes/scene_2.png?t=1789734122501",
+    "isGeneratingAudio": false,
+    "audioUrl": "/storage/projects/proj_1789733870551_dy3uf/audio/scene_2.wav?t=1789734149054",
+    "actualDurationSeconds": 10.04
+  }
+]

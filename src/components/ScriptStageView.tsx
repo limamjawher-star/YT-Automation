@@ -67,7 +67,12 @@ export const ScriptStageView: React.FC<ScriptStageViewProps> = ({
         <div>
           <div className="flex items-center gap-2 text-rose-400 text-xs font-semibold uppercase tracking-wider mb-1">
             <FileText className="w-3.5 h-3.5" />
-            Stage 1 &bull; Script & Storyboard
+            Stage 2 &bull; Script & Storyboard
+            {project.researchStatus && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 lowercase">
+                grounded in {project.researchStatus} research
+              </span>
+            )}
           </div>
           <h2 className="text-lg sm:text-xl font-bold text-white line-clamp-1">
             {project.title || project.topic}

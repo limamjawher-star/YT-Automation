@@ -1,0 +1,101 @@
+[
+  {
+    "id": "asset_c2NlbmVzL3NjZW5l",
+    "projectId": "proj_1789733870551_dy3uf",
+    "type": "image",
+    "relativePath": "scenes/scene_0.png",
+    "publicUrl": "/storage/projects/proj_1789733870551_dy3uf/scenes/scene_0.png",
+    "filename": "scene_0.png",
+    "sizeBytes": 191806,
+    "mimeType": "image/png",
+    "createdAt": "2026-09-18T12:22:01.632Z"
+  },
+  {
+    "id": "asset_c2NlbmVzL3NjZW5l",
+    "projectId": "proj_1789733870551_dy3uf",
+    "type": "image",
+    "relativePath": "scenes/scene_1.png",
+    "publicUrl": "/storage/projects/proj_1789733870551_dy3uf/scenes/scene_1.png",
+    "filename": "scene_1.png",
+    "sizeBytes": 152140,
+    "mimeType": "image/png",
+    "createdAt": "2026-09-18T12:22:02.069Z"
+  },
+  {
+    "id": "asset_c2NlbmVzL3NjZW5l",
+    "projectId": "proj_1789733870551_dy3uf",
+    "type": "image",
+    "relativePath": "scenes/scene_2.png",
+    "publicUrl": "/storage/projects/proj_1789733870551_dy3uf/scenes/scene_2.png",
+    "filename": "scene_2.png",
+    "sizeBytes": 178231,
+    "mimeType": "image/png",
+    "createdAt": "2026-09-18T12:22:02.494Z"
+  },
+  {
+    "id": "asset_YXVkaW8vc2NlbmVf",
+    "projectId": "proj_1789733870551_dy3uf",
+    "type": "audio",
+    "relativePath": "audio/scene_0.wav",
+    "publicUrl": "/storage/projects/proj_1789733870551_dy3uf/audio/scene_0.wav",
+    "filename": "scene_0.wav",
+    "sizeBytes": 633644,
+    "mimeType": "audio/wav",
+    "createdAt": "2026-09-18T12:22:14.471Z"
+  },
+  {
+    "id": "asset_YXVkaW8vc2NlbmVf",
+    "projectId": "proj_1789733870551_dy3uf",
+    "type": "audio",
+    "relativePath": "audio/scene_1.wav",
+    "publicUrl": "/storage/projects/proj_1789733870551_dy3uf/audio/scene_1.wav",
+    "filename": "scene_1.wav",
+    "sizeBytes": 466604,
+    "mimeType": "audio/wav",
+    "createdAt": "2026-09-18T12:22:20.990Z"
+  },
+  {
+    "id": "asset_YXVkaW8vc2NlbmVf",
+    "projectId": "proj_1789733870551_dy3uf",
+    "type": "audio",
+    "relativePath": "audio/scene_2.wav",
+    "publicUrl": "/storage/projects/proj_1789733870551_dy3uf/audio/scene_2.wav",
+    "filename": "scene_2.wav",
+    "sizeBytes": 481964,
+    "mimeType": "audio/wav",
+    "createdAt": "2026-09-18T12:22:28.962Z"
+  },
+  {
+    "id": "asset_legacy_thumbnail_png",
+    "projectId": "proj_1789733870551_dy3uf",
+    "type": "thumbnail",
+    "relativePath": "thumbnail.png",
+    "publicUrl": "/storage/projects/proj_1789733870551_dy3uf/thumbnail.png",
+    "filename": "thumbnail.png",
+    "sizeBytes": 152038,
+    "mimeType": "image/png",
+    "createdAt": "2026-09-18T12:23:38.230Z"
+  },
+  {
+    "id": "asset_legacy_video_mp4",
+    "projectId": "proj_1789733870551_dy3uf",
+    "type": "video",
+    "relativePath": "video.mp4",
+    "publicUrl": "/storage/projects/proj_1789733870551_dy3uf/video.mp4",
+    "filename": "video.mp4",
+    "sizeBytes": 2976888,
+    "mimeType": "video/mp4",
+    "createdAt": "2026-09-18T12:23:09.520Z"
+  },
+  {
+    "id": "asset_legacy_subtitles_srt",
+    "projectId": "proj_1789733870551_dy3uf",
+    "type": "subtitle",
+    "relativePath": "subtitles.srt",
+    "publicUrl": "/storage/projects/proj_1789733870551_dy3uf/subtitles.srt",
+    "filename": "subtitles.srt",
+    "sizeBytes": 165,
+    "mimeType": "text/plain; charset=utf-8",
+    "createdAt": "2026-09-18T12:23:09.436Z"
+  }
+]

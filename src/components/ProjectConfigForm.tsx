@@ -28,6 +28,8 @@ interface ProjectConfigFormProps {
     visualStyle: VisualStyle;
     voice: VoiceName;
     targetDurationMinutes: number;
+    userProvidedSources?: string;
+    userResearchNotes?: string;
   }) => void;
   onSaveAndNextStage: (data: {
     topic: string;
@@ -36,6 +38,8 @@ interface ProjectConfigFormProps {
     visualStyle: VisualStyle;
     voice: VoiceName;
     targetDurationMinutes: number;
+    userProvidedSources?: string;
+    userResearchNotes?: string;
   }) => void;
   isLoading: boolean;
 }
@@ -91,6 +95,9 @@ export const ProjectConfigForm: React.FC<ProjectConfigFormProps> = ({
   const [visualStyle, setVisualStyle] = useState<VisualStyle>(project?.visualStyle || 'Cinematic Photorealism');
   const [voice, setVoice] = useState<VoiceName>(project?.voice || 'Kore');
   const [duration, setDuration] = useState<number>(project?.targetDurationMinutes || 1);
+  const [userProvidedSources, setUserProvidedSources] = useState<string>(project?.userProvidedSources || '');
+  const [userResearchNotes, setUserResearchNotes] = useState<string>(project?.userResearchNotes || '');
+  const [showAdvancedResearch, setShowAdvancedResearch] = useState<boolean>(false);
 
   const handleSubmit = (runAll: boolean) => {
     if (!topic.trim()) return;
@@ -101,6 +108,8 @@ export const ProjectConfigForm: React.FC<ProjectConfigFormProps> = ({
       visualStyle,
       voice,
       targetDurationMinutes: duration,
+      userProvidedSources: userProvidedSources.trim() || undefined,
+      userResearchNotes: userResearchNotes.trim() || undefined,
     };
     if (runAll) {
       onSaveAndRunAll(payload);
@@ -320,6 +329,47 @@ export const ProjectConfigForm: React.FC<ProjectConfigFormProps> = ({
           </div>
         </div>
 
+        {/* Optional Provider-Agnostic Research Grounding & Notes */}
+        <div className="border-t border-slate-800/80 pt-3">
+          <button
+            type="button"
+            onClick={() => setShowAdvancedResearch(!showAdvancedResearch)}
+            className="text-xs text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1.5 cursor-pointer py-1"
+          >
+            <span>{showAdvancedResearch ? '▼' : '▶'} Optional: Provide Custom Research Sources & Creator Notes</span>
+          </button>
+
+          {showAdvancedResearch && (
+            <div className="mt-3 space-y-3 p-3.5 bg-slate-950/60 border border-slate-800 rounded-xl">
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">
+                  Custom Sources / Reference URLs (Provider-Agnostic)
+                </label>
+                <textarea
+                  value={userProvidedSources}
+                  onChange={(e) => setUserProvidedSources(e.target.value)}
+                  placeholder="https://en.wikipedia.org/wiki/... or paste reference material text"
+                  rows={2}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-rose-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">
+                  Initial Editorial Notes / Angles
+                </label>
+                <textarea
+                  value={userResearchNotes}
+                  onChange={(e) => setUserResearchNotes(e.target.value)}
+                  placeholder="Specify key angles to focus on, facts to emphasize, or claims to avoid..."
+                  rows={2}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-rose-500"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Action Buttons */}
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-3 border-t border-slate-800/80">
           <button
@@ -329,7 +379,7 @@ export const ProjectConfigForm: React.FC<ProjectConfigFormProps> = ({
             onClick={() => handleSubmit(false)}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
           >
-            <span>Step 1: Generate Script & Plan</span>
+            <span>Step 1: Dedicated Research & Fact Dossier</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
 

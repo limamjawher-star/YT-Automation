@@ -1,24 +1,31 @@
-import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import util from 'util';
 import { Scene, VideoAspectRatio } from '../src/types.js';
+import { processManager, ProcessRunOptions } from './utils/processManager.js';
 
-const execPromise = util.promisify(exec);
+export { processManager };
+
+export function terminateJobProcesses(jobId: string): number {
+  return processManager.terminateJobProcesses(jobId);
+}
 
 export async function checkFfmpegInstalled(): Promise<boolean> {
   try {
-    const { stdout } = await execPromise('ffmpeg -version');
+    const { stdout } = await processManager.execCancellable('ffmpeg -version');
     return stdout.includes('ffmpeg version');
-  } catch (err) {
+  } catch {
     return false;
   }
 }
 
-export async function getAudioDuration(audioPath: string): Promise<number> {
+export async function getAudioDuration(
+  audioPath: string,
+  options: ProcessRunOptions = {}
+): Promise<number> {
   try {
-    const { stdout } = await execPromise(
-      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`
+    const { stdout } = await processManager.execCancellable(
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`,
+      options
     );
     const duration = parseFloat(stdout.trim());
     if (isNaN(duration) || duration <= 0) {
@@ -26,6 +33,7 @@ export async function getAudioDuration(audioPath: string): Promise<number> {
     }
     return Math.round(duration * 100) / 100;
   } catch (err) {
+    if (options.signal?.aborted) throw err;
     console.warn(`Could not probe audio duration for ${audioPath}, using fallback.`, err);
     return 5.0;
   }
@@ -38,8 +46,15 @@ export async function createSceneClip(
   duration: number,
   aspectRatio: VideoAspectRatio,
   sceneNumber: number,
-  onScreenText?: string
+  onScreenText?: string,
+  options: ProcessRunOptions = {}
 ): Promise<void> {
+  if (options.signal?.aborted) {
+    const err = new Error('Scene clip creation aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
+
   const isLandscape = aspectRatio === '16:9';
   const width = isLandscape ? 1920 : 1080;
   const height = isLandscape ? 1080 : 1920;
@@ -55,7 +70,7 @@ export async function createSceneClip(
     // Pan right slowly
     `zoompan=z=1.1:x='min(x+0.8,(iw-iw/zoom))':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=25`,
     // Pan left slowly
-    `zoompan=z=1.1:x='max((iw-iw/zoom)-0.8*on,0)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=25`
+    `zoompan=z=1.1:x='max((iw-iw/zoom)-0.8*on,0)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${width}x${height}:fps=25`,
   ];
 
   const motionFilter = zoomStyles[sceneNumber % zoomStyles.length];
@@ -64,30 +79,36 @@ export async function createSceneClip(
   try {
     // Attempt with motion zoompan filter
     const cmd = `ffmpeg -y -loop 1 -t ${safeDuration} -i "${imagePath}" -i "${audioPath}" -vf "${baseFilter}" -c:v libx264 -preset fast -pix_fmt yuv420p -c:a aac -b:a 192k -shortest "${outputPath}"`;
-    await execPromise(cmd);
-  } catch (zoomErr) {
+    await processManager.execCancellable(cmd, options);
+  } catch (zoomErr: any) {
+    if (options.signal?.aborted || zoomErr?.name === 'AbortError') {
+      throw zoomErr;
+    }
     console.warn(`Zoompan filter failed for scene ${sceneNumber}, falling back to static scale:`, zoomErr);
     // Fallback without zoompan if memory/image geometry issues occur
     const fallbackFilter = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`;
     const fallbackCmd = `ffmpeg -y -loop 1 -t ${safeDuration} -i "${imagePath}" -i "${audioPath}" -vf "${fallbackFilter}" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -c:a aac -b:a 192k -shortest "${outputPath}"`;
-    await execPromise(fallbackCmd);
+    await processManager.execCancellable(fallbackCmd, options);
   }
 }
 
 export async function concatenateSceneClips(
   clipPaths: string[],
   outputVideoPath: string,
-  projectDir: string
+  projectDir: string,
+  options: ProcessRunOptions = {}
 ): Promise<void> {
   const listFilePath = path.join(projectDir, 'concat_list.txt');
-  const fileContent = clipPaths.map(p => `file '${path.resolve(p)}'`).join('\n');
+  const fileContent = clipPaths.map((p) => `file '${path.resolve(p)}'`).join('\n');
   fs.writeFileSync(listFilePath, fileContent, 'utf8');
 
-  const cmd = `ffmpeg -y -f concat -safe 0 -i "${listFilePath}" -c copy "${outputVideoPath}"`;
-  await execPromise(cmd);
-
-  if (fs.existsSync(listFilePath)) {
-    fs.unlinkSync(listFilePath);
+  try {
+    const cmd = `ffmpeg -y -f concat -safe 0 -i "${listFilePath}" -c copy "${outputVideoPath}"`;
+    await processManager.execCancellable(cmd, { ...options, cwd: projectDir });
+  } finally {
+    if (fs.existsSync(listFilePath)) {
+      fs.unlinkSync(listFilePath);
+    }
   }
 }
 
@@ -124,15 +145,24 @@ export async function burnSubtitles(
   inputVideoPath: string,
   srtPath: string,
   outputVideoPath: string,
-  projectDir: string
+  projectDir: string,
+  onDegraded?: (warning: string) => void,
+  options: ProcessRunOptions = {}
 ): Promise<void> {
   try {
     // Escape path for ffmpeg subtitles filter
     const relativeSrt = path.relative(projectDir, srtPath).replace(/\\/g, '/');
     const cmd = `ffmpeg -y -i "${inputVideoPath}" -vf "subtitles=${relativeSrt}:force_style='Fontsize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=2,Shadow=1,MarginV=35'" -c:a copy "${outputVideoPath}"`;
-    await execPromise(cmd, { cwd: projectDir });
-  } catch (err) {
-    console.warn('Subtitle burn-in failed (possibly font library issue), copying clean video without burned captions:', err);
+    await processManager.execCancellable(cmd, { ...options, cwd: projectDir });
+  } catch (err: any) {
+    if (options.signal?.aborted || err?.name === 'AbortError') {
+      throw err;
+    }
+    const warnMsg = 'Subtitle burn-in filter skipped (font library or libass unavailable); exported clean video without burned captions.';
+    console.warn(warnMsg, err);
+    if (onDegraded) {
+      onDegraded(warnMsg);
+    }
     fs.copyFileSync(inputVideoPath, outputVideoPath);
   }
 }
@@ -140,33 +170,38 @@ export async function burnSubtitles(
 export async function createThumbnail(
   sourceImagePath: string,
   outputThumbnailPath: string,
-  aspectRatio: VideoAspectRatio
+  aspectRatio: VideoAspectRatio,
+  options: ProcessRunOptions = {}
 ): Promise<void> {
   const isLandscape = aspectRatio === '16:9';
   const width = isLandscape ? 1280 : 1080;
   const height = isLandscape ? 720 : 1920;
   try {
     const cmd = `ffmpeg -y -i "${sourceImagePath}" -vf "scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}" -q:v 2 "${outputThumbnailPath}"`;
-    await execPromise(cmd);
-  } catch (err) {
+    await processManager.execCancellable(cmd, options);
+  } catch (err: any) {
+    if (options.signal?.aborted || err?.name === 'AbortError') {
+      throw err;
+    }
     console.warn('Could not generate resized thumbnail, copying source image:', err);
-    fs.copyFileSync(sourceImagePath, outputThumbnailPath);
+    if (fs.existsSync(sourceImagePath)) {
+      fs.copyFileSync(sourceImagePath, outputThumbnailPath);
+    }
   }
 }
 
-// Generate fallback visual banner if image generation API is unavailable or quota limited
 export async function generateFallbackSceneImage(
   outputPath: string,
   sceneNumber: number,
   topic: string,
   visualDescription: string,
-  aspectRatio: VideoAspectRatio
+  aspectRatio: VideoAspectRatio,
+  options: ProcessRunOptions = {}
 ): Promise<void> {
   const isLandscape = aspectRatio === '16:9';
   const width = isLandscape ? 1920 : 1080;
   const height = isLandscape ? 1080 : 1920;
 
-  // Curated cinematic palettes
   const palettes = [
     { bg1: '#0f172a', bg2: '#1e293b', accent: '#38bdf8' },
     { bg1: '#18181b', bg2: '#27272a', accent: '#fbbf24' },
@@ -203,39 +238,18 @@ export async function generateFallbackSceneImage(
   <rect width="${width}" height="${height}" fill="url(#bgGrad)" />
   <circle cx="${width / 2}" cy="${height / 2}" r="${Math.min(width, height) * 0.4}" fill="url(#glow)" />
   
-  <!-- Cinematic Grid / Framing -->
   <rect x="60" y="60" width="${width - 120}" height="${height - 120}" fill="none" stroke="${p.accent}" stroke-opacity="0.2" stroke-width="2" rx="20" />
   
-  <!-- Scene Tag -->
   <rect x="${width / 2 - 120}" y="140" width="240" height="48" rx="24" fill="${p.accent}" fill-opacity="0.15" stroke="${p.accent}" stroke-width="1.5" />
   <text x="${width / 2}" y="171" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="${p.accent}" text-anchor="middle" letter-spacing="3">SCENE ${sceneNumber + 1}</text>
   
-  <!-- Topic Title -->
   <text x="${width / 2}" y="${height / 2 - 20}" font-family="system-ui, -apple-system, sans-serif" font-size="${isLandscape ? 56 : 48}" font-weight="800" fill="#ffffff" text-anchor="middle">
     ${safeTopic}
   </text>
   
-  <!-- Visual Concept Summary -->
   <text x="${width / 2}" y="${height / 2 + 50}" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#cbd5e1" text-anchor="middle" font-weight="400">
     ${safeDesc}
   </text>
-  
-  <!-- Decorative Audio Wave Vector -->
-  <g transform="translate(${width / 2 - 100}, ${height - 180})" opacity="0.6">
-    <rect x="0" y="10" width="8" height="40" rx="4" fill="${p.accent}" />
-    <rect x="16" y="0" width="8" height="60" rx="4" fill="${p.accent}" />
-    <rect x="32" y="15" width="8" height="30" rx="4" fill="${p.accent}" />
-    <rect x="48" y="5" width="8" height="50" rx="4" fill="${p.accent}" />
-    <rect x="64" y="20" width="8" height="20" rx="4" fill="${p.accent}" />
-    <rect x="80" y="0" width="8" height="60" rx="4" fill="${p.accent}" />
-    <rect x="96" y="8" width="8" height="45" rx="4" fill="${p.accent}" />
-    <rect x="112" y="15" width="8" height="30" rx="4" fill="${p.accent}" />
-    <rect x="128" y="2" width="8" height="55" rx="4" fill="${p.accent}" />
-    <rect x="144" y="12" width="8" height="36" rx="4" fill="${p.accent}" />
-    <rect x="160" y="22" width="8" height="16" rx="4" fill="${p.accent}" />
-    <rect x="176" y="6" width="8" height="48" rx="4" fill="${p.accent}" />
-    <rect x="192" y="14" width="8" height="32" rx="4" fill="${p.accent}" />
-  </g>
 </svg>
   `;
 
@@ -243,48 +257,57 @@ export async function generateFallbackSceneImage(
   fs.writeFileSync(svgPath, svgContent, 'utf8');
 
   try {
-    await execPromise(`ffmpeg -y -i "${svgPath}" "${outputPath}"`);
+    await processManager.execCancellable(`ffmpeg -y -i "${svgPath}" "${outputPath}"`, options);
     if (fs.existsSync(svgPath)) {
       fs.unlinkSync(svgPath);
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (options.signal?.aborted || err?.name === 'AbortError') {
+      throw err;
+    }
     console.error('Failed to convert SVG to PNG with ffmpeg, saving raw SVG:', err);
-    // Keep svg or write raw buffer
   }
 }
 
-// Generate fallback audio tone / cadence if TTS quota is limited
-export async function generateFallbackAudio(outputPath: string, durationSeconds: number, text: string): Promise<void> {
+export async function generateFallbackAudio(
+  outputPath: string,
+  durationSeconds: number,
+  text: string,
+  options: ProcessRunOptions = {}
+): Promise<void> {
   const duration = Math.max(durationSeconds || 4, 3);
   try {
-    // Generate clean subtle audio synth voice tone or speech
-    // Uses Google Translate TTS as a lightweight 100% Google audio fallback
     const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text.slice(0, 150))}&tl=en&client=tw-ob`;
     const tempMp3 = outputPath.replace(/\.wav$/, '_temp.mp3');
     
     const res = await fetch(googleTTSUrl, {
+      signal: options.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      },
     });
 
     if (res.ok) {
       const arrayBuf = await res.arrayBuffer();
       fs.writeFileSync(tempMp3, Buffer.from(arrayBuf));
-      // Convert MP3 to standard WAV using FFmpeg
-      await execPromise(`ffmpeg -y -i "${tempMp3}" -ar 24000 -ac 1 "${outputPath}"`);
+      await processManager.execCancellable(`ffmpeg -y -i "${tempMp3}" -ar 24000 -ac 1 "${outputPath}"`, options);
       if (fs.existsSync(tempMp3)) fs.unlinkSync(tempMp3);
       return;
     }
-  } catch (fetchErr) {
+  } catch (fetchErr: any) {
+    if (options.signal?.aborted || fetchErr?.name === 'AbortError') {
+      throw fetchErr;
+    }
     console.warn('Google Translate TTS endpoint fallback failed, synthesizing audio tone via FFmpeg:', fetchErr);
   }
 
-  // Pure FFmpeg sine/voice frequency audio generator if network fails
   try {
     const cmd = `ffmpeg -y -f lavfi -i "sine=frequency=440:duration=${duration}" -af "volume=0.2" -ar 24000 -ac 1 "${outputPath}"`;
-    await execPromise(cmd);
-  } catch (err) {
+    await processManager.execCancellable(cmd, options);
+  } catch (err: any) {
+    if (options.signal?.aborted || err?.name === 'AbortError') {
+      throw err;
+    }
     console.error('Failed to generate fallback audio:', err);
   }
 }
